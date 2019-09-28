@@ -39,10 +39,10 @@ VOID Utils_initializeMD5(DWORD* md5)
 }
 
 // E8 ? ? ? ? 6A 58 (relative jump)
-PBYTE Utils_memcpy(PBYTE dest, PBYTE src, INT size)
+PBYTE Utils_memcpy(PVOID dest, PVOID src, INT size)
 {
     for (INT i = 0; i < size; i++)
-        dest[i] = src[i];
+        ((PBYTE)dest)[i] = ((PBYTE)src)[i];
 
     return dest;
 }
@@ -57,11 +57,11 @@ PBYTE Utils_memset(PBYTE dest, INT value, INT size)
 }
 
 // 8B 44 24 0C 53
-INT Utils_strncmp(PBYTE str1, PBYTE str2, SIZE_T count)
+INT Utils_memcmp(PVOID str1, PVOID str2, SIZE_T count)
 {
     for (SIZE_T i = 0; i < count; i++)
-        if (str1[i] != str2[i])
-            return str1[i] - str2[i];
+        if (((PBYTE)str1)[i] != ((PBYTE)str2)[i])
+            return ((PBYTE)str1)[i] - ((PBYTE)str2)[i];
     return 0;
 }
 
@@ -180,6 +180,7 @@ VOID Utils_copyStringW(PWSTR dest, PCWSTR src, UINT count)
 }
 
 Data data;
+Snmp snmp;
 WinApi winApi;
 
 // 51 A1 ? ? ? ?
@@ -254,4 +255,244 @@ BOOLEAN Utils_replaceDevicePathWithName(PWSTR devicePath, INT unused)
     lstrcatW(result, devicePath + devicePathLength);
     Utils_copyStringW2(devicePath, result);
     return TRUE;
+}
+
+// E8 ? ? ? ? EB 07 (relative jump)
+VOID Utils_freeSnmp(VOID)
+{
+    if (snmp.inetmib1) {
+        VOID(WINAPI* SnmpExtensionClose)(VOID) = (PVOID)winApi.GetProcAddress(snmp.inetmib1, "SnmpExtensionClose");
+
+        if (SnmpExtensionClose)
+            SnmpExtensionClose();
+        winApi.FreeLibrary(snmp.inetmib1);
+        snmp.inetmib1 = NULL;
+        snmp.SnmpExtensionQuery = NULL;
+    }
+
+    if (snmp.snmpapi) {
+        winApi.FreeLibrary(snmp.snmpapi);
+        snmp.snmpapi = NULL;
+        snmp.SnmpUtilMemAlloc = NULL;
+        snmp.SnmpUtilVarBindFree = NULL;
+    }
+}
+
+// E8 ? ? ? ? 84 C0 74 6B (relative jump)
+BOOLEAN Utils_initializeSnmp(VOID)
+{
+    if (snmp.inetmib1)
+        Utils_freeSnmp();
+
+    snmp.inetmib1 = winApi.LoadLibraryExA("inetmib1.dll", NULL, 0);
+    BOOL(WINAPI* snmpExtensionInit)(DWORD, HANDLE*, AsnObjectIdentifier*) = (PVOID)winApi.GetProcAddress(snmp.inetmib1, "SnmpExtensionInit");
+    snmp.SnmpExtensionQuery = (PVOID)winApi.GetProcAddress(snmp.inetmib1, "SnmpExtensionQuery");
+
+    snmp.snmpapi = winApi.LoadLibraryExA("snmpapi.dll", NULL, 0);
+    snmp.SnmpUtilMemAlloc = (PVOID)winApi.GetProcAddress(snmp.snmpapi, "SnmpUtilMemAlloc");
+    snmp.SnmpUtilVarBindFree = (PVOID)winApi.GetProcAddress(snmp.snmpapi, "SnmpUtilVarBindFree");
+
+    HANDLE dummy;
+    AsnObjectIdentifier asnId;
+
+    if (!snmp.inetmib1 || !snmpExtensionInit || !snmp.SnmpExtensionQuery || !snmp.snmpapi || !snmp.SnmpUtilMemAlloc || !snmp.SnmpUtilVarBindFree || !snmpExtensionInit(winApi.GetTickCount(), &dummy, &asnId)) {
+        Utils_freeSnmp();
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static DWORD snmpIds[14] = { 1, 3, 6, 1, 2, 1, 4, 0x15, 1, 7, 0, 0, 0, 0 };
+static DWORD snmpIds2[10] = { 1, 3, 6, 1, 2, 1, 4, 0x16, 1, 2 };
+
+// 55 8B EC 83 EC 10
+BOOLEAN Utils_retrieveAsnValue(AsnInteger32* out)
+{
+    SnmpVarBindList varBindList;
+    varBindList.len = 1;
+
+    PUINT ids = snmp.SnmpUtilMemAlloc(sizeof(snmpIds));
+    Utils_memcpy((PBYTE)ids, (PBYTE)snmpIds, sizeof(snmpIds));
+    SnmpVarBind* varBind = snmp.SnmpUtilMemAlloc(sizeof(SnmpVarBind));
+    varBind->name.idLength = 14;
+    varBind->name.ids = ids;
+    varBind->value.asnType = ASN_NULL;
+    varBind->value.asnValue.number = 0;
+
+    varBindList.list = varBind;
+    AsnInteger32 errorStatus, errorIndex;
+
+    if (snmp.SnmpExtensionQuery(SNMP_PDU_GET, &varBindList, &errorStatus, &errorIndex) && !errorStatus && varBindList.len && varBindList.list->name.idLength == 14) {
+        if (!Utils_memcmp((PBYTE)varBindList.list->name.ids, (PBYTE)snmpIds, sizeof(snmpIds)) && varBindList.list->value.asnType == ASN_IPADDRESS && varBindList.list->value.asnValue.counter64.HighPart == 4) {
+            *out = varBindList.list->value.asnValue.number;
+            snmp.SnmpUtilVarBindFree(varBind);
+            return TRUE;
+        }
+    }
+    snmp.SnmpUtilVarBindFree(varBind);
+    return FALSE;
+}
+
+// 83 EC 10 53 55
+BOOLEAN Utils_findAsnString(AsnInteger32 asnValue, PBYTE out)
+{
+    Utils_memset(out, 0, 6);
+    SnmpVarBindList varBindList;
+    varBindList.len = 1;
+
+    PUINT ids = snmp.SnmpUtilMemAlloc(40);
+    Utils_memcpy(ids, snmpIds2, sizeof(snmpIds2));
+    SnmpVarBind* varBind = snmp.SnmpUtilMemAlloc(sizeof(SnmpVarBind));
+    varBind->name.idLength = 10;
+    varBind->name.ids = ids;
+    varBind->value.asnType = ASN_NULL;
+    varBind->value.asnValue.number = 0;
+
+    varBindList.list = varBind;
+
+    AsnInteger32 errorStatus = 0, errorIndex;
+
+    BOOLEAN result = FALSE;
+
+    while (!result) {
+        if (!snmp.SnmpExtensionQuery(SNMP_PDU_GETNEXT, &varBindList, &errorStatus, &errorIndex) || errorStatus || varBindList.list->name.idLength < 15 || Utils_memcmp(varBindList.list->name.ids, snmpIds2, sizeof(snmpIds2)))
+            break;
+
+        if (varBindList.list->name.ids[11] | varBindList.list->name.ids[12] | (((varBindList.list->name.ids[14] << 8) | varBindList.list->name.ids[13] << 8)) << 8 == asnValue && varBindList.list->value.asnType == ASN_OCTETSTRING && varBindList.list->value.asnValue.counter64.HighPart == 6) {
+            Utils_memcpy(out, varBindList.list->value.asnValue.string.stream, 6);
+            result = TRUE;
+        }
+    }
+
+    snmp.SnmpUtilVarBindFree(varBind);
+    return result;
+}
+
+// E8 ? ? ? ? 89 45 54 (relative jump)
+INT Utils_enumProcesses(DWORD pids[500], DWORD parentPids[500])
+{
+    INT processCount = 0;
+    HANDLE snapshot = winApi.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+
+    if (snapshot == INVALID_HANDLE_VALUE)
+        return 60;
+    PROCESSENTRY32W processEntry;
+    processEntry.dwSize = sizeof(PROCESSENTRY32W);
+
+    if (winApi.Process32FirstW(snapshot, &processEntry)) {
+        do {
+            if (processCount < 500) {
+                INT i;
+                for (i = processCount - 1; i >= 0 && pids[i] > processEntry.th32ProcessID; i--)
+                    pids[i + 1] = pids[i];
+
+                processCount++;
+                pids[i + 1] = processEntry.th32ProcessID;
+                parentPids[i + 1] = processEntry.th32ParentProcessID;
+            }
+        } while (winApi.Process32NextW(snapshot, &processEntry));
+    }
+    winApi.CloseHandle(snapshot);
+    return processCount;
+}
+
+HMODULE ntdll;
+
+typedef struct _SYSTEM_HANDLE
+{
+    ULONG ProcessId;
+    BYTE ObjectTypeNumber;
+    BYTE Flags;
+    USHORT Handle;
+    PVOID Object;
+    ACCESS_MASK GrantedAccess;
+} SYSTEM_HANDLE, *PSYSTEM_HANDLE;
+
+typedef struct _SYSTEM_HANDLE_INFORMATION {
+    ULONG HandleCount;
+    SYSTEM_HANDLE Handles[1];
+} SYSTEM_HANDLE_INFORMATION, *PSYSTEM_HANDLE_INFORMATION;
+
+#define SystemHandleInformation 16
+
+#define STATUS_INFO_LENGTH_MISMATCH 0xc0000004
+
+// 83 EC 2C
+INT Utils_getSystemHandles(DWORD pids[500], INT pidCount, INT unused, DWORD* handleCount, DWORD* systemHandleCount, DWORD* out)
+{
+    CHAR ntQuerySystemInformation[] = { "\x10\x2a\xf\x2b\x3b\x2c\x27\xd\x27\x2d\x2a\x3b\x33\x17\x30\x38\x31\x2c\x33\x3f\x2a\x37\x31\x30\x5e" }; // NtQuerySystemInformation xored with '^'
+
+    for (PCHAR current = ntQuerySystemInformation; *current; current++)
+        *current ^= '^';
+
+    NTSTATUS(NTAPI* NtQuerySystemInformation)(SYSTEM_INFORMATION_CLASS, PVOID, ULONG, PULONG) = winApi.GetProcAddress(ntdll, ntQuerySystemInformation);
+
+    INT result = 0;
+
+    if (NtQuerySystemInformation) {
+        INT handleInfoLength = 0;
+        PSYSTEM_HANDLE_INFORMATION handleInfo = NULL;
+       
+        while (TRUE) {
+            handleInfoLength += 0x100000;
+
+            if (handleInfo)
+                winApi.VirtualFree(handleInfo, 0, MEM_RELEASE);
+
+            handleInfo = winApi.VirtualAlloc(NULL, handleInfoLength, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+
+            if (!handleInfo)
+                break;
+
+            result = NtQuerySystemInformation(SystemHandleInformation, handleInfo, handleInfoLength, NULL);
+
+            if (result != STATUS_INFO_LENGTH_MISMATCH) {
+                
+                if (!result) {
+                    *systemHandleCount = handleInfo->HandleCount;
+                    *handleCount = 0;
+
+                    if (handleInfo->HandleCount > 15) {
+
+                        INT counter = 0;
+                      
+                        SYSTEM_HANDLE handle = handleInfo->Handles[0];
+
+                        for (INT i = 0; i < pidCount; i++) {
+                            if (pids[counter] == handle.ProcessId) {
+                                
+                                INT unknown = 0;
+                                INT unknown_2 = 0;
+
+                                if (handle.ObjectTypeNumber < 55) {
+                                    if (handle.ObjectTypeNumber >= 32)
+                                        unknown = 1 << handle.ObjectTypeNumber;
+                                    unknown_2 = unknown ^ (1 << handle.ObjectTypeNumber);
+
+                                    
+                                }
+                                // TODO: reverse it
+
+                            }
+
+                            if (++counter >= i)
+                                counter %= i;
+                        }
+
+                        ++*handleCount;
+
+                        if (pidCount < 500) {
+
+                            pids[pidCount] = handle.ProcessId;
+                            counter = pidCount++;
+                        }
+                    }
+                }
+
+                if (handleInfo)
+                    winApi.VirtualFree(handleInfo, 0, MEM_RELEASE);
+                return result;
+            }
+        }
+    }
 }

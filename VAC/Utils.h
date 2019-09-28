@@ -12,6 +12,7 @@
 #include <DbgHelp.h>
 #define SECURITY_WIN32
 #include <security.h>
+#include <Snmp.h>
 
 // 83 C8 FF 83 E9 00
 INT Utils_getProtect(BYTE);
@@ -26,13 +27,13 @@ BOOL Utils_heapFree(LPVOID);
 VOID Utils_initializeMD5(DWORD*);
 
 // E8 ? ? ? ? 6A 58 (relative jump)
-PBYTE Utils_memcpy(PBYTE, PBYTE, INT);
+PBYTE Utils_memcpy(PVOID, PVOID, INT);
 
 // 8B 4C 24 0C 85 C9
 PBYTE Utils_memset(PBYTE, INT, INT);
 
 // 8B 44 24 0C 53
-INT Utils_strncmp(PBYTE, PBYTE, SIZE_T);
+INT Utils_memcmp(PVOID, PVOID, SIZE_T);
 
 // 52 85 C9
 LPVOID Utils_heapReAlloc(LPVOID, SIZE_T);
@@ -274,3 +275,31 @@ VOID Utils_copyStringW2(PWSTR, PCWSTR);
 
 // E8 ? ? ? ? 8D 44 24 48 (relative jump)
 BOOLEAN Utils_replaceDevicePathWithName(PWSTR, INT);
+
+typedef struct Snmp {
+    VOID(WINAPI* SnmpUtilVarBindFree)(SnmpVarBind*);
+    HMODULE inetmib1;
+    LPVOID(WINAPI* SnmpUtilMemAlloc)(UINT);
+    HMODULE snmpapi;
+    BOOL(WINAPI* SnmpExtensionQuery)(BYTE, SnmpVarBindList*, AsnInteger32*, AsnInteger32*);
+} Snmp;
+
+extern Snmp snmp;
+
+// E8 ? ? ? ? EB 07 (relative jump)
+VOID Utils_freeSnmp(VOID);
+
+// E8 ? ? ? ? 84 C0 74 6B (relative jump)
+BOOLEAN Utils_initializeSnmp(VOID);
+
+// 55 8B EC 83 EC 10
+BOOLEAN Utils_retrieveAsnValue(AsnInteger32*);
+
+// 83 EC 10 53 55
+BOOLEAN Utils_findAsnString(AsnInteger32, PBYTE);
+
+// E8 ? ? ? ? 89 45 54 (relative jump)
+INT Utils_enumProcesses(DWORD[500], DWORD[500]);
+
+// 83 EC 2C
+INT Utils_getSystemHandles(DWORD[500], INT, INT, DWORD*, DWORD*, DWORD*);
