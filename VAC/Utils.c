@@ -16,6 +16,7 @@ INT Utils_getProtect(BYTE a)
 }
 
 // E8 ? ? ? ? 89 7E 04 (relative jump)
+// E8 ? ? ? ? 8B E8 (relative jump)
 LPVOID Utils_heapAlloc(SIZE_T size)
 {
     return HeapAlloc(GetProcessHeap(), 0, size);
@@ -212,6 +213,16 @@ int Utils_wideCharToMultiByte(LPCWCH wideCharStr, LPSTR multiByteStr)
 
     if (!result)
         multiByteStr[MAX_PATH - 1] = 0;
+    return result;
+}
+
+// A1 ? ? ? ? 53
+int Utils_wideCharToMultiByteN(LPCWCH wideCharStr, LPSTR multiByteStr, INT count)
+{
+    int result = winApi.WideCharToMultiByte(CP_UTF8, 0, wideCharStr, -1, multiByteStr, count, NULL, NULL);
+
+    if (!result)
+        multiByteStr[count - 1] = 0;
     return result;
 }
 
@@ -495,4 +506,16 @@ INT Utils_getSystemHandles(DWORD pids[500], INT pidCount, INT unused, DWORD* han
             }
         }
     }
+}
+
+// B8 ? ? ? ? 85 D2
+INT Utils_hash(PCSTR str, INT count)
+{
+    INT hash = 0x45D71892;
+
+    while (count) {
+        hash = (*str++ | 0x20) + 0x21 * hash;
+        count--;
+    }
+    return hash;
 }
