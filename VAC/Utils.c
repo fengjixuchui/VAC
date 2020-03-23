@@ -39,34 +39,6 @@ VOID Utils_initializeMD5(DWORD* md5)
     md5[5] = 0;
 }
 
-// E8 ? ? ? ? 6A 58 (relative jump)
-// E8 ? ? ? ? 6A 04 (relative jump)
-PBYTE Utils_memcpy(PVOID dest, LPCVOID src, INT size)
-{
-    for (INT i = 0; i < size; i++)
-        ((PBYTE)dest)[i] = ((PBYTE)src)[i];
-
-    return dest;
-}
-
-// 8B 4C 24 0C 85 C9
-PBYTE Utils_memset(PBYTE dest, INT value, INT size)
-{
-    for (INT i = 0; i < size; i++)
-        dest[i] = value;
-
-    return dest;
-}
-
-// 8B 44 24 0C 53
-INT Utils_memcmp(PVOID str1, PVOID str2, SIZE_T count)
-{
-    for (SIZE_T i = 0; i < count; i++)
-        if (((PBYTE)str1)[i] != ((PBYTE)str2)[i])
-            return ((PBYTE)str1)[i] - ((PBYTE)str2)[i];
-    return 0;
-}
-
 // 52 85 C9
 LPVOID Utils_heapReAlloc(LPVOID memory, SIZE_T size)
 {
@@ -149,7 +121,7 @@ VOID Utils_resetFunctionsAndModuleHandles(VOID)
     }
     moduleHandlesCount = 0;
 
-    Utils_memset((PBYTE)&winApi, 0, sizeof(winApi));
+    memset((PBYTE)&winApi, 0, sizeof(winApi));
     winapiFunctionsCount = 0;
 }
 
@@ -175,10 +147,10 @@ LPCWSTR Utils_skipPath(LPCWSTR string)
 // E8 ? ? ? ? 32 C0 59 (relative jump)
 VOID Utils_copyStringW(PWSTR dest, PCWSTR src, UINT count)
 {
-    Utils_memcpy((PBYTE)dest, (PBYTE)src, count * sizeof(WCHAR));
+    memcpy((PBYTE)dest, (PBYTE)src, count * sizeof(WCHAR));
     UINT srcLength = lstrlenW(src);
     if (count > srcLength)
-        Utils_memset((PBYTE)(dest + srcLength), 0, (count - srcLength) * sizeof(WCHAR));
+        memset((PBYTE)(dest + srcLength), 0, (count - srcLength) * sizeof(WCHAR));
 }
 
 Data data;
@@ -230,10 +202,10 @@ int Utils_wideCharToMultiByteN(LPCWCH wideCharStr, LPSTR multiByteStr, INT count
 // E8 ? ? ? ? 59 B0 01 (relative jump)
 VOID Utils_copyStringW2(PWSTR dest, PCWSTR src)
 {
-    Utils_memcpy((PBYTE)dest, (PBYTE)src, 512 * sizeof(WCHAR));
+    memcpy((PBYTE)dest, (PBYTE)src, 512 * sizeof(WCHAR));
     INT srcLength = lstrlenW(src);
     if (srcLength < 512)
-        Utils_memset((PBYTE)(dest + srcLength), 0, (512 - srcLength) * sizeof(WCHAR));
+        memset((PBYTE)(dest + srcLength), 0, (512 - srcLength) * sizeof(WCHAR));
 }
 
 // E8 ? ? ? ? 8D 44 24 48 (relative jump)
@@ -324,7 +296,7 @@ BOOLEAN Utils_retrieveAsnValue(AsnInteger32* out)
     varBindList.len = 1;
 
     PUINT ids = snmp.SnmpUtilMemAlloc(sizeof(snmpIds));
-    Utils_memcpy((PBYTE)ids, (PBYTE)snmpIds, sizeof(snmpIds));
+    memcpy((PBYTE)ids, (PBYTE)snmpIds, sizeof(snmpIds));
     SnmpVarBind* varBind = snmp.SnmpUtilMemAlloc(sizeof(SnmpVarBind));
     varBind->name.idLength = 14;
     varBind->name.ids = ids;
@@ -335,7 +307,7 @@ BOOLEAN Utils_retrieveAsnValue(AsnInteger32* out)
     AsnInteger32 errorStatus, errorIndex;
 
     if (snmp.SnmpExtensionQuery(SNMP_PDU_GET, &varBindList, &errorStatus, &errorIndex) && !errorStatus && varBindList.len && varBindList.list->name.idLength == 14) {
-        if (!Utils_memcmp((PBYTE)varBindList.list->name.ids, (PBYTE)snmpIds, sizeof(snmpIds)) && varBindList.list->value.asnType == ASN_IPADDRESS && varBindList.list->value.asnValue.counter64.HighPart == 4) {
+        if (!memcmp((PBYTE)varBindList.list->name.ids, (PBYTE)snmpIds, sizeof(snmpIds)) && varBindList.list->value.asnType == ASN_IPADDRESS && varBindList.list->value.asnValue.counter64.HighPart == 4) {
             *out = varBindList.list->value.asnValue.number;
             snmp.SnmpUtilVarBindFree(varBind);
             return TRUE;
@@ -348,12 +320,12 @@ BOOLEAN Utils_retrieveAsnValue(AsnInteger32* out)
 // 83 EC 10 53 55
 BOOLEAN Utils_findAsnString(AsnInteger32 asnValue, PBYTE out)
 {
-    Utils_memset(out, 0, 6);
+    memset(out, 0, 6);
     SnmpVarBindList varBindList;
     varBindList.len = 1;
 
     PUINT ids = snmp.SnmpUtilMemAlloc(40);
-    Utils_memcpy(ids, snmpIds2, sizeof(snmpIds2));
+    memcpy(ids, snmpIds2, sizeof(snmpIds2));
     SnmpVarBind* varBind = snmp.SnmpUtilMemAlloc(sizeof(SnmpVarBind));
     varBind->name.idLength = 10;
     varBind->name.ids = ids;
@@ -367,11 +339,11 @@ BOOLEAN Utils_findAsnString(AsnInteger32 asnValue, PBYTE out)
     BOOLEAN result = FALSE;
 
     while (!result) {
-        if (!snmp.SnmpExtensionQuery(SNMP_PDU_GETNEXT, &varBindList, &errorStatus, &errorIndex) || errorStatus || varBindList.list->name.idLength < 15 || Utils_memcmp(varBindList.list->name.ids, snmpIds2, sizeof(snmpIds2)))
+        if (!snmp.SnmpExtensionQuery(SNMP_PDU_GETNEXT, &varBindList, &errorStatus, &errorIndex) || errorStatus || varBindList.list->name.idLength < 15 || memcmp(varBindList.list->name.ids, snmpIds2, sizeof(snmpIds2)))
             break;
 
         if (varBindList.list->name.ids[11] | varBindList.list->name.ids[12] | (((varBindList.list->name.ids[14] << 8) | varBindList.list->name.ids[13] << 8)) << 8 == asnValue && varBindList.list->value.asnType == ASN_OCTETSTRING && varBindList.list->value.asnValue.counter64.HighPart == 6) {
-            Utils_memcpy(out, varBindList.list->value.asnValue.string.stream, 6);
+            memcpy(out, varBindList.list->value.asnValue.string.stream, 6);
             result = TRUE;
         }
     }
@@ -408,114 +380,13 @@ INT Utils_enumProcesses(DWORD pids[500], DWORD parentPids[500])
     return processCount;
 }
 
-HMODULE ntdll;
-
-typedef struct _SYSTEM_HANDLE
-{
-    ULONG ProcessId;
-    BYTE ObjectTypeNumber;
-    BYTE Flags;
-    USHORT Handle;
-    PVOID Object;
-    ACCESS_MASK GrantedAccess;
-} SYSTEM_HANDLE, *PSYSTEM_HANDLE;
-
-typedef struct _SYSTEM_HANDLE_INFORMATION {
-    ULONG HandleCount;
-    SYSTEM_HANDLE Handles[1];
-} SYSTEM_HANDLE_INFORMATION, *PSYSTEM_HANDLE_INFORMATION;
-
-#define SystemHandleInformation 16
-
-#define STATUS_INFO_LENGTH_MISMATCH 0xc0000004
-
-// 83 EC 2C
-INT Utils_getSystemHandles(DWORD pids[500], INT pidCount, INT unused, DWORD* handleCount, DWORD* systemHandleCount, DWORD* out)
-{
-    CHAR ntQuerySystemInformation[] = { "\x10\x2a\xf\x2b\x3b\x2c\x27\xd\x27\x2d\x2a\x3b\x33\x17\x30\x38\x31\x2c\x33\x3f\x2a\x37\x31\x30\x5e" }; // NtQuerySystemInformation xored with '^'
-
-    for (PCHAR current = ntQuerySystemInformation; *current; current++)
-        *current ^= '^';
-
-    NTSTATUS(NTAPI* NtQuerySystemInformation)(SYSTEM_INFORMATION_CLASS, PVOID, ULONG, PULONG) = winApi.GetProcAddress(ntdll, ntQuerySystemInformation);
-
-    INT result = 0;
-
-    if (NtQuerySystemInformation) {
-        INT handleInfoLength = 0;
-        PSYSTEM_HANDLE_INFORMATION handleInfo = NULL;
-       
-        while (TRUE) {
-            handleInfoLength += 0x100000;
-
-            if (handleInfo)
-                winApi.VirtualFree(handleInfo, 0, MEM_RELEASE);
-
-            handleInfo = winApi.VirtualAlloc(NULL, handleInfoLength, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-
-            if (!handleInfo)
-                break;
-
-            result = NtQuerySystemInformation(SystemHandleInformation, handleInfo, handleInfoLength, NULL);
-
-            if (result != STATUS_INFO_LENGTH_MISMATCH) {
-                
-                if (!result) {
-                    *systemHandleCount = handleInfo->HandleCount;
-                    *handleCount = 0;
-
-                    if (handleInfo->HandleCount > 15) {
-
-                        INT counter = 0;
-                      
-                        SYSTEM_HANDLE handle = handleInfo->Handles[0];
-
-                        for (INT i = 0; i < pidCount; i++) {
-                            if (pids[counter] == handle.ProcessId) {
-                                
-                                INT unknown = 0;
-                                INT unknown_2 = 0;
-
-                                if (handle.ObjectTypeNumber < 55) {
-                                    if (handle.ObjectTypeNumber >= 32)
-                                        unknown = 1 << handle.ObjectTypeNumber;
-                                    unknown_2 = unknown ^ (1 << handle.ObjectTypeNumber);
-
-                                    
-                                }
-                                // TODO: reverse it
-
-                            }
-
-                            if (++counter >= i)
-                                counter %= i;
-                        }
-
-                        ++*handleCount;
-
-                        if (pidCount < 500) {
-
-                            pids[pidCount] = handle.ProcessId;
-                            counter = pidCount++;
-                        }
-                    }
-                }
-
-                if (handleInfo)
-                    winApi.VirtualFree(handleInfo, 0, MEM_RELEASE);
-                return result;
-            }
-        }
-    }
-}
-
 // B8 ? ? ? ? 85 D2
-INT Utils_hash(PCSTR str, INT count)
+UINT Utils_hash(LPCVOID data, INT count)
 {
-    INT hash = 0x45D71892;
+    UINT hash = 0x45D71892;
 
     while (count) {
-        hash = (*str++ | 0x20) + 0x21 * hash;
+        hash = (*((PBYTE)data)++ | 32) + 33 * hash;
         count--;
     }
     return hash;

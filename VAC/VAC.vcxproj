@@ -158,6 +158,9 @@
     <ClCompile Include="Encryption\Ice.c" />
     <ClCompile Include="Modules\DeviceInfo\DeviceInfo.c" />
     <ClCompile Include="Modules\DriverInfo\DriverInfo.c" />
+    <ClCompile Include="Modules\ProcessHandleList\ProcessHandleList.c" />
+    <ClCompile Include="Modules\ProcessMonitor\ProcessMonitor.c" />
+    <ClCompile Include="Modules\SystemInfo\SystemInfo.c" />
     <ClCompile Include="Utils.c" />
     <ClCompile Include="Vector.c" />
   </ItemGroup>
@@ -165,6 +168,9 @@
     <ClInclude Include="Encryption\Ice.h" />
     <ClInclude Include="Modules\DeviceInfo\DeviceInfo.h" />
     <ClInclude Include="Modules\DriverInfo\DriverInfo.h" />
+    <ClInclude Include="Modules\ProcessHandleList\ProcessHandleList.h" />
+    <ClInclude Include="Modules\ProcessMonitor\ProcessMonitor.h" />
+    <ClInclude Include="Modules\SystemInfo\SystemInfo.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="Vector.h" />
   </ItemGroup>

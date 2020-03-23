@@ -26,16 +26,6 @@ BOOL Utils_heapFree(LPVOID);
 // 83 61 10 00 83 61 14 00
 VOID Utils_initializeMD5(DWORD*);
 
-// E8 ? ? ? ? 6A 58 (relative jump)
-// E8 ? ? ? ? 6A 04 (relative jump)
-PBYTE Utils_memcpy(PVOID dest, LPCVOID src, INT size);
-
-// 8B 4C 24 0C 85 C9
-PBYTE Utils_memset(PBYTE, INT, INT);
-
-// 8B 44 24 0C 53
-INT Utils_memcmp(PVOID, PVOID, SIZE_T);
-
 // 52 85 C9
 LPVOID Utils_heapReAlloc(LPVOID, SIZE_T);
 
@@ -305,8 +295,5 @@ BOOLEAN Utils_findAsnString(AsnInteger32, PBYTE);
 // E8 ? ? ? ? 89 45 54 (relative jump)
 INT Utils_enumProcesses(DWORD[500], DWORD[500]);
 
-// 83 EC 2C
-INT Utils_getSystemHandles(DWORD[500], INT, INT, DWORD*, DWORD*, DWORD*);
-
 // B8 ? ? ? ? 85 D2
-INT Utils_hash(PCSTR str, INT count);
+UINT Utils_hash(LPCVOID data, INT count);
