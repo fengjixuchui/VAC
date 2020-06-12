@@ -160,6 +160,7 @@
     <ClCompile Include="Modules\DriverInfo\DriverInfo.c" />
     <ClCompile Include="Modules\ProcessHandleList\ProcessHandleList.c" />
     <ClCompile Include="Modules\ProcessMonitor\ProcessMonitor.c" />
+    <ClCompile Include="Modules\ReadModules\ReadModules.c" />
     <ClCompile Include="Modules\SystemInfo\SystemInfo.c" />
     <ClCompile Include="Utils.c" />
     <ClCompile Include="Vector.c" />
@@ -170,6 +171,7 @@
     <ClInclude Include="Modules\DriverInfo\DriverInfo.h" />
     <ClInclude Include="Modules\ProcessHandleList\ProcessHandleList.h" />
     <ClInclude Include="Modules\ProcessMonitor\ProcessMonitor.h" />
+    <ClInclude Include="Modules\ReadModules\ReadModules.h" />
     <ClInclude Include="Modules\SystemInfo\SystemInfo.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="Vector.h" />
